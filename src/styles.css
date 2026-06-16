@@ -266,3 +266,34 @@
 
 .story-link:hover::after { width: 100%; }
 
+/* ─── Markdown / code block styles ───────────────────────────────── */
+
+/* Ensure pre blocks inside markdown don't double-wrap */
+.markdown-body pre { margin: 0; }
+
+/* Scrollbar styling for code blocks */
+.markdown-body pre::-webkit-scrollbar {
+  height: 6px;
+}
+.markdown-body pre::-webkit-scrollbar-track {
+  background: transparent;
+}
+.markdown-body pre::-webkit-scrollbar-thumb {
+  background: rgba(148,163,184,0.4);
+  border-radius: 3px;
+}
+
+/* Streaming cursor blink at end of assistant message */
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.streaming-cursor::after {
+  content: '▋';
+  display: inline-block;
+  margin-left: 1px;
+  animation: cursor-blink 0.75s step-end infinite;
+  color: #3b82f6;
+  font-size: 0.85em;
+}
+

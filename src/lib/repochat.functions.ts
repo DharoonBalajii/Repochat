@@ -110,7 +110,7 @@ function stripBold(s: string) {
 export const askQuestion = createServerFn({ method: "POST" })
   .inputValidator(
     z.object({
-      question: z.string().min(1),
+      messages: z.array(z.object({ role: z.enum(["user", "assistant"]), content: z.string() })).min(1),
       files: z.array(z.object({ path: z.string(), content: z.string() })).min(1),
     }),
   )
@@ -122,6 +122,16 @@ export const askQuestion = createServerFn({ method: "POST" })
       .map((f) => `--- FILE: ${f.path} ---\n${f.content}`)
       .join("\n\n");
 
+    const systemPrompt = `You are RepoChat, an expert code assistant. Answer questions using ONLY the provided repository files below. Format your responses using markdown:
+- Use **bold** for emphasis and important terms
+- Use bullet lists with - for items
+- Use fenced code blocks with language tags (\`\`\`typescript, \`\`\`python, \`\`\`javascript, etc.) when showing code
+- Use inline \`code\` for short code references
+- Be helpful, clear, and concise
+
+Repository context:
+${context}`;
+
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -131,15 +141,8 @@ export const askQuestion = createServerFn({ method: "POST" })
       body: JSON.stringify({
         model: "openrouter/owl-alpha",
         messages: [
-          {
-            role: "system",
-            content:
-              "You are RepoChat, a helpful code assistant. Answer using only the provided repository files. Reply in plain text only — do NOT use any markdown syntax: no #, ##, ### headings, no **bold**, no *italics*, no backticks, no bullet asterisks. Use plain sentences and, if listing, start lines with '- '.",
-          },
-          {
-            role: "user",
-            content: `Repository files:\n\n${context}\n\nQuestion: ${data.question}`,
-          },
+          { role: "system", content: systemPrompt },
+          ...data.messages,
         ],
       }),
     });
@@ -152,6 +155,7 @@ export const askQuestion = createServerFn({ method: "POST" })
     const json = (await res.json()) as {
       choices: { message: { content: string } }[];
     };
-    const raw = json.choices?.[0]?.message?.content ?? "No answer.";
-    return { answer: stripBold(raw) };
+    const answer = json.choices?.[0]?.message?.content ?? "No answer.";
+    return { answer };
   });
+
