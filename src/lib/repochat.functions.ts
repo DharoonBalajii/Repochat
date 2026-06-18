@@ -139,7 +139,7 @@ ${context}`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "openai/gpt-4o-mini",
+        model: "openrouter/owl-alpha",
         messages: [
           { role: "system", content: systemPrompt },
           ...data.messages,
