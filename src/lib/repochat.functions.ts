@@ -139,7 +139,7 @@ ${context}`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        models: ["openrouter/owl-alpha", "poolside/laguna-m.1:free", "poolside/laguna-xs.2:free"],
+        models: ["openrouter/owl-alpha", "poolside/laguna-m.1:free", "poolside/laguna-xs.2:free", "qwen/qwen-3-next-80b-a3b-instruct:free"],
         messages: [
           { role: "system", content: systemPrompt },
           ...data.messages,

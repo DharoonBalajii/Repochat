@@ -304,8 +304,13 @@ function AppPage() {
       typewriterStream(res.answer, assistantIdx);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed";
-      if (isRateLimit(msg)) setLimitHit(true);
-      else setChatError(msg);
+      if (isRateLimit(msg)) {
+        setLimitHit(true);
+      } else if (msg.includes("Inactivity Timeout") || msg.includes("Timeout") || msg.includes("Too much time") || msg.includes("504") || msg.includes("502")) {
+        setChatError("Having some high demand or traffic on today please excuse for the delay or somthing");
+      } else {
+        setChatError(msg);
+      }
       // Remove placeholder
       setMessages((prev) => prev.slice(0, -1));
     } finally {
