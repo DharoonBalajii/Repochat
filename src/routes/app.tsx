@@ -224,6 +224,9 @@ function AppPage() {
   const isRateLimit = (msg: string) =>
     /\b429\b|too many requests|rate[- ]?limit|insufficient[_ ]?credits/i.test(msg);
 
+  const isTrafficError = (msg: string) =>
+    /inactivity timeout|timeout|too much time|504|502|errortype|unknown error/i.test(msg);
+
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 60);
     setRecentRepos(getRecent());
@@ -276,9 +279,18 @@ function AppPage() {
       saveRecent(url);
       setRecentRepos(getRecent());
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to load repository";
-      if (isRateLimit(msg)) setLimitHit(true);
-      else setProcessError(msg);
+      let msg = err instanceof Error ? err.message : "Failed to load repository";
+      if (isRateLimit(msg)) {
+        setLimitHit(true);
+      } else if (isTrafficError(msg)) {
+        setProcessError("Having some high demand or traffic on today please excuse for the delay or somthing");
+      } else {
+        try {
+          const parsed = JSON.parse(msg);
+          msg = parsed.errorMessage || msg;
+        } catch {}
+        setProcessError(msg);
+      }
     } finally {
       setProcessing(false);
     }
@@ -303,12 +315,16 @@ function AppPage() {
       // Start typewriter with full answer
       typewriterStream(res.answer, assistantIdx);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed";
+      let msg = err instanceof Error ? err.message : "Failed";
       if (isRateLimit(msg)) {
         setLimitHit(true);
-      } else if (msg.includes("Inactivity Timeout") || msg.includes("Timeout") || msg.includes("Too much time") || msg.includes("504") || msg.includes("502")) {
+      } else if (isTrafficError(msg)) {
         setChatError("Having some high demand or traffic on today please excuse for the delay or somthing");
       } else {
+        try {
+          const parsed = JSON.parse(msg);
+          msg = parsed.errorMessage || msg;
+        } catch {}
         setChatError(msg);
       }
       // Remove placeholder
