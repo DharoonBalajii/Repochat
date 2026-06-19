@@ -139,7 +139,12 @@ ${context}`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        models: ["openrouter/owl-alpha", "google/gemini-1.5-flash", "poolside/laguna-m.1:free"],
+        models: [
+          "google/gemini-2.5-flash",
+          "meta-llama/llama-3.1-8b-instruct:free",
+          "google/gemma-4-26b-a4b-it:free",
+          "poolside/laguna-m.1:free"
+        ],
         messages: [
           { role: "system", content: systemPrompt },
           ...data.messages,
@@ -149,7 +154,11 @@ ${context}`;
 
     if (!res.ok) {
       const txt = await res.text();
-      throw new Error(`OpenRouter ${res.status}: ${txt.slice(0, 200)}`);
+      let errorMsg = `OpenRouter ${res.status}: ${txt.slice(0, 200)}`;
+      if (errorMsg.toLowerCase().includes("high traffic") || res.status === 429 || res.status === 529) {
+        throw new Error("AI models are currently busy. Please try again in a few seconds.");
+      }
+      throw new Error(errorMsg);
     }
 
     const json = (await res.json()) as {
