@@ -301,6 +301,12 @@ function AppPage() {
     const q = (overrideQuestion ?? input).trim();
     if (!q || !files || asking || streamingIdx !== null) return;
 
+    const userMsgCount = messages.filter((m) => m.role === "user").length;
+    if (userMsgCount >= 2) {
+      setChatError("To prevent overusage of API tokens, chat is limited to 2 messages. This is just for testing, not actual use.");
+      return;
+    }
+
     setChatError("");
     const userMsg: ChatMessage = { role: "user", content: q };
     const newHistory = [...messages, userMsg];

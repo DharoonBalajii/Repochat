@@ -115,9 +115,6 @@ export const askQuestion = createServerFn({ method: "POST" })
     }),
   )
   .handler(async ({ data }) => {
-    const key = process.env.OPENROUTER_API_KEY;
-    if (!key) throw new Error("OPENROUTER_API_KEY not configured");
-
     const context = data.files
       .map((f) => `--- FILE: ${f.path} ---\n${f.content}`)
       .join("\n\n");
@@ -132,39 +129,67 @@ export const askQuestion = createServerFn({ method: "POST" })
 Repository context:
 ${context}`;
 
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        models: [
-          "google/gemini-2.5-flash",
-          "meta-llama/llama-3.1-8b-instruct:free",
-          "google/gemma-4-26b-a4b-it:free",
-          "poolside/laguna-m.1:free"
-        ],
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...data.messages,
-        ],
-      }),
-    });
+    const orKey = process.env.OPENROUTER_API_KEY;
+    const geminiKey = process.env.GEMINI_API_KEY;
 
-    if (!res.ok) {
-      const txt = await res.text();
-      let errorMsg = `OpenRouter ${res.status}: ${txt.slice(0, 200)}`;
-      if (errorMsg.toLowerCase().includes("high traffic") || res.status === 429 || res.status === 529) {
-        throw new Error("AI models are currently busy. Please try again in a few seconds.");
-      }
-      throw new Error(errorMsg);
+    async function callOpenRouter(model: string) {
+      if (!orKey) throw new Error("OPENROUTER_API_KEY not configured");
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${orKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "system", content: systemPrompt }, ...data.messages],
+        }),
+      });
+      if (!res.ok) throw new Error(`OpenRouter ${res.status}: ${await res.text()}`);
+      const json = (await res.json()) as any;
+      return json.choices?.[0]?.message?.content ?? "No answer.";
     }
 
-    const json = (await res.json()) as {
-      choices: { message: { content: string } }[];
-    };
-    const answer = json.choices?.[0]?.message?.content ?? "No answer.";
-    return { answer };
+    async function callGeminiNative() {
+      if (!geminiKey) throw new Error("GEMINI_API_KEY not configured");
+      const contents = data.messages.map((m) => ({
+        role: m.role === "assistant" ? "model" : "user",
+        parts: [{ text: m.content }],
+      }));
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemPrompt }] },
+          contents,
+        }),
+      });
+      if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
+      const json = (await res.json()) as any;
+      return json.candidates?.[0]?.content?.parts?.[0]?.text ?? "No answer.";
+    }
+
+    try {
+      // Option 1: Free model via OpenRouter
+      const ans = await callOpenRouter("meta-llama/llama-3.1-8b-instruct:free");
+      return { answer: ans };
+    } catch (e1) {
+      console.error("Option 1 (Free) failed:", e1);
+      try {
+        // Option 2: Gemini native via Google AI Studio
+        const ans = await callGeminiNative();
+        return { answer: ans };
+      } catch (e2) {
+        console.error("Option 2 (Gemini Native) failed:", e2);
+        try {
+          // Option 3: Extremely cheap fallback via OpenRouter
+          const ans = await callOpenRouter("google/gemini-2.5-flash");
+          return { answer: ans };
+        } catch (e3) {
+          console.error("Option 3 (Cheap) failed:", e3);
+          throw new Error("AI models are currently busy. Please try again in a few seconds.");
+        }
+      }
+    }
   });
 
